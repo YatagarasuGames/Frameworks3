@@ -1,0 +1,118 @@
+.leaflet-container {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: #f8f9fa;
+}
+
+.leaflet-control-zoom a {
+    color: #495057;
+    background: white;
+    border: 1px solid #dee2e6;
+}
+
+    .leaflet-control-zoom a:hover {
+        background: #e9ecef;
+    }
+
+.leaflet-popup-content-wrapper {
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.leaflet-popup-content {
+    margin: 12px;
+}
+
+    .leaflet-popup-content h3 {
+        margin-top: 0;
+        color: #0d6efd;
+    }
+
+    .leaflet-popup-content table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+    }
+
+    .leaflet-popup-content td {
+        padding: 4px 8px;
+        border-top: 1px solid #dee2e6;
+    }
+
+        .leaflet-popup-content td:first-child {
+            font-weight: 600;
+            color: #495057;
+        }
+
+.iss-marker {
+    background: none;
+    border: none;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.6;
+    }
+
+    50% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0.6;
+    }
+}
+
+#map-status {
+    animation: pulse 1.5s infinite;
+}
+
+.app {
+    display: flex;
+    min-height: 100vh;
+}
+
+.navbar-card {
+    background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+    padding: 1rem;
+    width: 250px;
+    position: fixed;
+    height: 100vh;
+    left: 0;
+    top: 0;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.navbar-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+    .navbar-list li {
+        margin-bottom: 0.5rem;
+    }
+
+.nav-link {
+    color: white;
+    text-decoration: none;
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    display: block;
+    transition: background 0.3s ease;
+}
+
+    .nav-link:hover {
+        background: rgba(255,255,255,0.1);
+    }
+
+    .nav-link.active {
+        background: rgba(255,255,255,0.2);
+        font-weight: bold;
+    }
+
+.main-content {
+    margin-left: 250px;
+    flex: 1;
+    padding: 1rem;
+}

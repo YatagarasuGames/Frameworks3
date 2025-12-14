@@ -1,0 +1,148 @@
+﻿@page
+@{
+    ViewData["Title"] = "МКС";
+}
+
+<div class="card">
+    <h2>МКС</h2>
+
+    <div id="issMap" class="map mb-3"></div>
+
+    <div class="form-row">
+        <div style="flex: 1;">
+            <div>Скорость:</div>
+            <div id="issSpeed" class="text-muted">—</div>
+        </div>
+        <div style="flex: 1;">
+            <div>Высота:</div>
+            <div id="issAltitude" class="text-muted">—</div>
+        </div>
+        <div style="flex: 2;">
+            <div>Координаты:</div>
+            <div id="issCoords" class="text-muted">—</div>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div style="flex: 1;">
+            <canvas id="speedChart" class="chart-container"></canvas>
+        </div>
+        <div style="flex: 1;">
+            <canvas id="altChart" class="chart-container"></canvas>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let map, marker;
+        let speedChart, altChart;
+        const speedHistory = [];
+        const altHistory = [];
+        const timeLabels = [];
+        const MAX_POINTS = 10;
+
+
+        function initMap() {
+            map = L.map('issMap').setView([0, 0], 2);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+            marker = L.marker([0, 0]).addTo(map);
+        }
+
+
+        function initCharts() {
+            const speedCtx = document.getElementById('speedChart').getContext('2d');
+            const altCtx = document.getElementById('altChart').getContext('2d');
+
+            speedChart = new Chart(speedCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Скорость (км/ч)',
+                        data: [],
+                        borderColor: '#333',
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+
+            altChart = new Chart(altCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Высота (км)',
+                        data: [],
+                        borderColor: '#666',
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        async function loadIssData() {
+            try {
+                const response = await fetch('/SpaceCache/iss/current');
+                if (!response.ok) throw new Error('Ошибка загрузки');
+
+                const data = await response.json();
+                updateDisplay(data.data);
+                updateMapAndCharts(data.data);
+            } catch (error) {
+                console.error('Ошибка:', error);
+            }
+        }
+
+        function updateDisplay(data) {
+            document.getElementById('issSpeed').textContent = data.velocity + ' км/ч';
+            document.getElementById('issAltitude').textContent = data.altitude + ' км';
+            document.getElementById('issCoords').textContent =
+                data.latitude.toFixed(4) + ', ' + data.longitude.toFixed(4);
+        }
+
+        function updateMapAndCharts(data) {
+            if (data.latitude && data.longitude) {
+                const latlng = [data.latitude, data.longitude];
+                marker.setLatLng(latlng);
+                map.setView(latlng, map.getZoom());
+            }
+
+            const time = new Date().toLocaleTimeString();
+            timeLabels.push(time);
+            speedHistory.push(data.velocity);
+            altHistory.push(data.altitude);
+
+            if (timeLabels.length > MAX_POINTS) {
+                timeLabels.shift();
+                speedHistory.shift();
+                altHistory.shift();
+            }
+
+            speedChart.data.labels = [...timeLabels];
+            speedChart.data.datasets[0].data = [...speedHistory];
+            speedChart.update();
+
+            altChart.data.labels = [...timeLabels];
+            altChart.data.datasets[0].data = [...altHistory];
+            altChart.update();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            initCharts();
+            loadIssData();
+            setInterval(loadIssData, 30000);
+        });
+    </script>
+}

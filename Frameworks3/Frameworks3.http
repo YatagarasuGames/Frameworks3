@@ -1,0 +1,6 @@
+@Frameworks3_HostAddress = http://localhost:5003
+
+GET {{Frameworks3_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

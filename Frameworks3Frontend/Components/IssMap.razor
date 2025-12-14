@@ -1,0 +1,103 @@
+﻿@using System.Text.Json
+@using Microsoft.JSInterop
+@inject HttpClient Http
+@inject JSRuntime JSRuntime
+
+<div class="iss-map-card">
+    <h3>МКС — положение и движение</h3>
+    <div @ref="mapContainer" class="map"></div>
+
+    <div class="row mt-3">
+        <div class="col-md-6">
+            <canvas @ref="speedChart"></canvas>
+        </div>
+        <div class="col-md-6">
+            <canvas @ref="altChart"></canvas>
+        </div>
+    </div>
+</div>
+
+@code {
+    private ElementReference mapContainer;
+    private ElementReference speedChart;
+    private ElementReference altChart;
+
+    private List<double> speedHistory = new();
+    private List<double> altHistory = new();
+    private List<string> timeLabels = new();
+    private const int MAX_POINTS = 20;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await InitializeMap();
+            await UpdateIssData();
+
+            var timer = new System.Threading.Timer(async _ =>
+            {
+                await InvokeAsync(async () =>
+                {
+                    await UpdateIssData();
+                    StateHasChanged();
+                });
+            }, null, 60000, 60000);
+        }
+    }
+
+    private async Task InitializeMap()
+    {
+        await JSRuntime.InvokeVoidAsync("issMap.init", mapContainer);
+    }
+
+    private async Task UpdateIssData()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<IssPosition>("/api/iss/current");
+
+            if (response != null)
+            {
+                await JSRuntime.InvokeVoidAsync("issMap.updateMarker",
+                    response.Latitude, response.Longitude);
+
+                UpdateCharts(response);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Ошибка обновления данных МКС: {ex.Message}");
+        }
+    }
+
+    private void UpdateCharts(IssPosition data)
+    {
+        var time = DateTime.Now.ToString("HH:mm:ss");
+
+        timeLabels.Add(time);
+        speedHistory.Add(data.Velocity);
+        altHistory.Add(data.Altitude);
+
+        if (timeLabels.Count > MAX_POINTS)
+        {
+            timeLabels.RemoveAt(0);
+            speedHistory.RemoveAt(0);
+            altHistory.RemoveAt(0);
+        }
+
+        JSRuntime.InvokeVoidAsync("issCharts.update",
+            timeLabels.ToArray(),
+            speedHistory.ToArray(),
+            altHistory.ToArray());
+    }
+
+    private class IssPosition
+    {
+        public double Latitude { get; set; }
+        public double Longitude { get; set; }
+        public double Velocity { get; set; }
+        public double Altitude { get; set; }
+        public long Timestamp { get; set; }
+        public string Visibility { get; set; } = "";
+    }
+}

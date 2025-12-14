@@ -1,0 +1,118 @@
+﻿@page
+@{
+    ViewData["Title"] = "Астрономия";
+}
+
+<div class="card">
+    <h2>Астрономические события</h2>
+
+    <div class="form-row">
+        <input type="number" id="lat" placeholder="Широта" value="55.7558" class="form-control">
+        <input type="number" id="lon" placeholder="Долгота" value="37.6176" class="form-control">
+        <input type="number" id="days" placeholder="Дней" value="7" class="form-control">
+        <button id="loadBtn" class="btn">Загрузить</button>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Объект</th>
+                    <th>Событие</th>
+                    <th>Время</th>
+                </tr>
+            </thead>
+            <tbody id="astroTable">
+
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+
+        async function loadAstroData() {
+            const lat = document.getElementById('lat').value || 55.7558;
+            const lon = document.getElementById('lon').value || 37.6176;
+            const days = document.getElementById('days').value || 7;
+
+            const tbody = document.getElementById('astroTable');
+            tbody.innerHTML = '<tr><td colspan="4">Загрузка...</td></tr>';
+
+            try {
+                const response = await fetch(`/astro/events?lat=${lat}&lon=${lon}&days=${days}`);
+                if (!response.ok) throw new Error('Ошибка загрузки');
+
+                const data = await response.json();
+                renderAstroTable(data);
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="4">Ошибка загрузки</td></tr>';
+            }
+        }
+
+
+        function renderAstroTable(apiData) {
+            const tbody = document.getElementById('astroTable');
+            tbody.innerHTML = '';
+
+            if (!apiData || !Array.isArray(apiData)) {
+                tbody.innerHTML = '<tr><td colspan="4">Нет данных</td></tr>';
+                return;
+            }
+
+            let events = [];
+
+
+            apiData.forEach(obj => {
+                const table = obj?.data?.data?.table;
+                if (!table || !table.rows) return;
+
+                table.rows.forEach(row => {
+                    const name = row.entry?.name || row.entry?.id || '—';
+                    const cells = row.cells || [];
+
+                    cells.forEach(cell => {
+                        if (cell.eventHighlights?.peak) {
+                            events.push({
+                                name: name,
+                                type: cell.type || '—',
+                                time: cell.eventHighlights.peak.date
+                            });
+                        } else if (cell.rise || cell.set) {
+                            events.push({
+                                name: name,
+                                type: cell.type || '—',
+                                time: cell.rise || cell.set || '—'
+                            });
+                        }
+                    });
+                });
+            });
+
+            events = events.slice(0, 50);
+
+            if (events.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4">Нет событий</td></tr>';
+                return;
+            }
+
+            events.forEach((event, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${index + 1}</td>
+                    <td>${event.name}</td>
+                    <td>${event.type}</td>
+                    <td>${event.time}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAstroData();
+            document.getElementById('loadBtn').addEventListener('click', loadAstroData);
+        });
+    </script>
+}
