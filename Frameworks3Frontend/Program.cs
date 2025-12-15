@@ -28,7 +28,7 @@ builder.Services.Configure<ApiUrls>(builder.Configuration.GetSection("Urls"));
 builder.Services.Configure<FetchTimes>(builder.Configuration.GetSection("Time"));
 builder.Services.AddDbContext<Context>(options => options.UseNpgsql(connectionString));
 builder.Services.AddHttpClient();
-
+builder.Services.AddHttpClient<IAstronomyService, AstronomyService>();
 builder.Services.AddScoped<IIssRepository, IssRepository>();
 builder.Services.AddScoped<ISpaceCacheRepository, SpaceCacheRepository>();
 builder.Services.AddScoped<IOsdrRepository, OsdrRepository>();
@@ -36,6 +36,7 @@ builder.Services.AddScoped<IIssService, IssService>();
 builder.Services.AddScoped<IOsdrService, OsdrService>();
 builder.Services.AddScoped<IRedisCacheService, RedisCacheService>();
 builder.Services.AddScoped<ITelemetryRepository, TelemetryRepository>();
+builder.Services.AddScoped<IAstronomyService, AstronomyService>();
 
 
 builder.Services.AddRazorPages();

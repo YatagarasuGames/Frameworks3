@@ -1,6 +1,6 @@
 ﻿@page
 @{
-    ViewData["Title"] = "Астрономия";
+    ViewData["Title"] = "Астрономические события";
 }
 
 <div class="card">
@@ -9,8 +9,20 @@
     <div class="form-row">
         <input type="number" id="lat" placeholder="Широта" value="55.7558" class="form-control">
         <input type="number" id="lon" placeholder="Долгота" value="37.6176" class="form-control">
-        <input type="number" id="days" placeholder="Дней" value="7" class="form-control">
+        <input type="number" id="days" placeholder="Дней" value="7" min="1" max="30" class="form-control">
         <button id="loadBtn" class="btn">Загрузить</button>
+    </div>
+
+    <div id="loading" style="display: none; padding: 10px; text-align: center;">
+        Загрузка данных...
+    </div>
+
+    <div id="error" style="display: none; padding: 10px; color: red;"></div>
+
+    <div id="info" style="display: none; padding: 10px; background-color: #f0f0f0; border-radius: 4px; margin-bottom: 15px;">
+        <strong>Координаты:</strong> <span id="infoCoords"></span> |
+        <strong>Событий:</strong> <span id="infoCount"></span> |
+        <strong>Загружено:</strong> <span id="infoTime"></span>
     </div>
 
     <div class="table-container">
@@ -19,92 +31,87 @@
                 <tr>
                     <th>#</th>
                     <th>Объект</th>
-                    <th>Событие</th>
-                    <th>Время</th>
+                    <th>Тип события</th>
+                    <th>Время (UTC)</th>
+                    <th>Описание</th>
+                    <th>Детали</th>
                 </tr>
             </thead>
             <tbody id="astroTable">
-
+                <tr>
+                    <td colspan="6" class="text-center text-muted">Введите параметры и нажмите "Загрузить"</td>
+                </tr>
             </tbody>
         </table>
     </div>
+
 </div>
 
 @section Scripts {
     <script>
-
         async function loadAstroData() {
-            const lat = document.getElementById('lat').value || 55.7558;
-            const lon = document.getElementById('lon').value || 37.6176;
-            const days = document.getElementById('days').value || 7;
+            const lat = parseFloat(document.getElementById('lat').value) || 55.7558;
+            const lon = parseFloat(document.getElementById('lon').value) || 37.6176;
+            const days = parseInt(document.getElementById('days').value) || 7;
 
-            const tbody = document.getElementById('astroTable');
-            tbody.innerHTML = '<tr><td colspan="4">Загрузка...</td></tr>';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            document.getElementById('info').style.display = 'none';
+            document.getElementById('astroTable').innerHTML =
+                '<tr><td colspan="6">Загрузка...</td></tr>';
 
             try {
-                const response = await fetch(`/astro/events?lat=${lat}&lon=${lon}&days=${days}`);
-                if (!response.ok) throw new Error('Ошибка загрузки');
+                // запрос к бэку
+                const response = await fetch(`/Astronomy/events?lat=${lat}&lon=${lon}&days=${days}`);
 
-                const data = await response.json();
-                renderAstroTable(data);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`Ошибка сервера: ${response.status}. ${errorText}`);
+                }
+
+                const result = await response.json();
+
+                document.getElementById('infoCoords').textContent = lat.toFixed(4) + ', ' + lon.toFixed(4);
+                document.getElementById('infoCount').textContent = result.count || '0';
+                document.getElementById('infoTime').textContent = new Date().toLocaleTimeString();
+                document.getElementById('info').style.display = 'block';
+
+                renderAstroTable(result);
+
             } catch (error) {
-                tbody.innerHTML = '<tr><td colspan="4">Ошибка загрузки</td></tr>';
+                console.error('Ошибка загрузки:', error);
+                document.getElementById('error').textContent = 'Ошибка: ' + error.message;
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('astroTable').innerHTML =
+                    '<tr><td colspan="6" class="text-center text-danger">Ошибка загрузки данных</td></tr>';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
             }
         }
 
-
-        function renderAstroTable(apiData) {
+        function renderAstroTable(result) {
             const tbody = document.getElementById('astroTable');
             tbody.innerHTML = '';
 
-            if (!apiData || !Array.isArray(apiData)) {
-                tbody.innerHTML = '<tr><td colspan="4">Нет данных</td></tr>';
+            if (!result || !result.success) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Ошибка: ' + (result?.error || 'Неизвестная ошибка') + '</td></tr>';
                 return;
             }
 
-            let events = [];
-
-
-            apiData.forEach(obj => {
-                const table = obj?.data?.data?.table;
-                if (!table || !table.rows) return;
-
-                table.rows.forEach(row => {
-                    const name = row.entry?.name || row.entry?.id || '—';
-                    const cells = row.cells || [];
-
-                    cells.forEach(cell => {
-                        if (cell.eventHighlights?.peak) {
-                            events.push({
-                                name: name,
-                                type: cell.type || '—',
-                                time: cell.eventHighlights.peak.date
-                            });
-                        } else if (cell.rise || cell.set) {
-                            events.push({
-                                name: name,
-                                type: cell.type || '—',
-                                time: cell.rise || cell.set || '—'
-                            });
-                        }
-                    });
-                });
-            });
-
-            events = events.slice(0, 50);
-
-            if (events.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4">Нет событий</td></tr>';
+            if (!result.events || result.events.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Нет событий для указанных параметров</td></tr>';
                 return;
             }
 
-            events.forEach((event, index) => {
+            result.events.forEach((event, index) => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
-                    <td>${index + 1}</td>
-                    <td>${event.name}</td>
-                    <td>${event.type}</td>
-                    <td>${event.time}</td>
+                    <td>${event.id || index + 1}</td>
+                    <td><strong>${event.body || '—'}</strong></td>
+                    <td>${event.type || '—'}</td>
+                    <td><code>${event.time || '—'}</code></td>
+                    <td>${event.description || '—'}</td>
+                    <td class="extra">${event.details || '—'}</td>
                 `;
                 tbody.appendChild(row);
             });
@@ -112,7 +119,24 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             loadAstroData();
+
             document.getElementById('loadBtn').addEventListener('click', loadAstroData);
+
+            ['lat', 'lon', 'days'].forEach(id => {
+                document.getElementById(id).addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        loadAstroData();
+                    }
+                });
+            });
         });
     </script>
+
+    <style>
+        .extra {
+            max-width: 300px;
+            white-space: normal;
+            word-break: break-word;
+        }
+    </style>
 }
