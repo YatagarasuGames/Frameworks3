@@ -65,6 +65,7 @@ builder.Services.Configure<FetchTimes>(builder.Configuration.GetSection("Time"))
 
 builder.Services.AddHttpClient();
 builder.Services.AddHttpClient<IIssService, IssService>();
+builder.Services.AddHttpClient<IAstronomyService, AstronomyService>();
 builder.Services.AddScoped<IIssRepository, IssRepository>();
 builder.Services.AddScoped<ISpaceCacheRepository, SpaceCacheRepository>();
 builder.Services.AddHostedService<IssBackgroundService>();
@@ -73,6 +74,7 @@ builder.Services.AddScoped<IOsdrService, OsdrService>();
 builder.Services.AddScoped<IOsdrRepository, OsdrRepository>();
 builder.Services.AddScoped<ISpaceCacheService, SpaceCacheService>();
 builder.Services.AddScoped<ITelemetryRepository, TelemetryRepository>();
+builder.Services.AddScoped<IAstronomyService, AstronomyService>();
 builder.Services.AddHttpClient<IssService>();
 builder.Services.AddScoped<IRedisCacheService, RedisCacheService>();
 builder.Services.AddSingleton(sp =>
