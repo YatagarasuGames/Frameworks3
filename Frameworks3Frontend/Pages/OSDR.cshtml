@@ -27,15 +27,29 @@
                 </tr>
             </thead>
             <tbody id="osdrTable">
-                <!-- жс подгрузка -->
+                <tr>
+                    <td colspan="4" class="text-center text-muted">Загрузка данных...</td>
+                </tr>
             </tbody>
         </table>
     </div>
 
     <div class="pagination">
-        <button id="prevBtn" class="btn">Назад</button>
-        <span id="pageInfo">Страница 1</span>
-        <button id="nextBtn" class="btn">Вперед</button>
+        <button id="prevBtn" class="btn" disabled>Назад</button>
+        <span id="pageInfo">Страница 1 из 1</span>
+        <button id="nextBtn" class="btn" disabled>Вперед</button>
+    </div>
+
+    <div id="detailsPanel" class="details-panel" style="display: none;">
+        <div class="details-header">
+            <h3 id="detailsTitle">Детали записи</h3>
+            <button id="closeDetails" class="btn btn-sm">✕ Закрыть</button>
+        </div>
+        <div class="details-content">
+            <div id="detailsInfo" class="details-info"></div>
+            <div id="detailsLinks" class="details-links"></div>
+            <div id="detailsRaw" class="details-raw"></div>
+        </div>
     </div>
 </div>
 
@@ -44,6 +58,7 @@
         let currentPage = 1;
         let itemsPerPage = 20;
         let allData = [];
+        let currentDetailsId = null;
 
         async function loadOsdrData() {
             try {
@@ -52,9 +67,11 @@
 
                 allData = await response.json();
                 renderTable();
+                hideDetails();
             } catch (error) {
+                console.error('Ошибка загрузки:', error);
                 document.getElementById('osdrTable').innerHTML =
-                    '<tr><td colspan="4">Ошибка загрузки</td></tr>';
+                    '<tr><td colspan="4" class="text-center text-danger">Ошибка загрузки данных</td></tr>';
             }
         }
 
@@ -67,14 +84,17 @@
             if (search) {
                 filtered = filtered.filter(item =>
                     (item.title && item.title.toLowerCase().includes(search)) ||
-                    (item.datasetId && item.datasetId.toLowerCase().includes(search))
+                    (item.datasetId && item.datasetId.toLowerCase().includes(search)) ||
+                    (item.description && item.description.toLowerCase().includes(search))
                 );
             }
 
             if (sortBy === 'title') {
                 filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
             } else if (sortBy === 'date') {
-                filtered.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+                filtered.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
+            } else {
+                filtered.sort((a, b) => a.id - b.id);
             }
 
             return filtered;
@@ -82,32 +102,48 @@
 
         function renderTable() {
             const filteredData = filterData();
-            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+            const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
             const start = (currentPage - 1) * itemsPerPage;
             const end = start + itemsPerPage;
             const pageData = filteredData.slice(start, end);
 
             document.getElementById('pageInfo').textContent =
-                `Страница ${currentPage} из ${totalPages}`;
+                `Страница ${currentPage} из ${totalPages} (всего: ${filteredData.length})`;
+
             document.getElementById('prevBtn').disabled = currentPage <= 1;
             document.getElementById('nextBtn').disabled = currentPage >= totalPages;
 
             const tbody = document.getElementById('osdrTable');
-            tbody.innerHTML = '';
 
-            if (pageData.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="4">Нет данных</td></tr>';
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Нет данных по запросу</td></tr>';
                 return;
             }
 
+            if (pageData.length === 0 && currentPage > 1) {
+                currentPage = Math.max(1, currentPage - 1);
+                renderTable();
+                return;
+            }
+
+            tbody.innerHTML = '';
+
             pageData.forEach(item => {
                 const row = document.createElement('tr');
+                const isActive = currentDetailsId === item.id;
+
+                if (isActive) {
+                    row.classList.add('active-row');
+                }
+
                 row.innerHTML = `
                     <td>${item.id}</td>
-                    <td>${item.title || '—'}</td>
-                    <td>${new Date(item.updatedAt).toLocaleDateString()}</td>
+                    <td><strong>${item.title || '—'}</strong></td>
+                    <td>${item.updatedAt ? new Date(item.updatedAt).toLocaleDateString() : '—'}</td>
                     <td>
-                        <button class="btn" onclick="showDetails(${item.id})">Подробнее</button>
+                        <button class="btn ${isActive ? 'btn-active' : ''}" onclick="showDetails(${item.id})">
+                            ${isActive ? 'Скрыть' : 'Подробнее'}
+                        </button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -116,16 +152,57 @@
 
         function showDetails(id) {
             const item = allData.find(i => i.id === id);
-            if (item) {
-                let details = '';
-                try {
-                    const raw = JSON.parse(item.raw);
-                    details = JSON.stringify(raw, null, 2);
-                } catch {
-                    details = item.raw || 'Нет данных';
-                }
-                alert(details);
+
+            if (!item) {
+                hideDetails();
+                return;
             }
+
+            if (currentDetailsId === id) {
+                hideDetails();
+                return;
+            }
+
+            currentDetailsId = id;
+
+            document.getElementById('detailsTitle').textContent = item.title || `Запись #${id}`;
+
+            const infoHtml = `
+                <div class="info-section">
+                    <h4>Основная информация</h4>
+                    <p><strong>ID:</strong> ${item.id}</p>
+                    ${item.datasetId ? `<p><strong>Dataset ID:</strong> ${item.datasetId}</p>` : ''}
+                    ${item.description ? `<p><strong>Описание:</strong> ${item.description}</p>` : ''}
+                    ${item.updatedAt ? `<p><strong>Обновлено:</strong> ${new Date(item.updatedAt).toLocaleString()}</p>` : ''}
+                    ${item.createdAt ? `<p><strong>Создано:</strong> ${new Date(item.createdAt).toLocaleString()}</p>` : ''}
+                </div>
+            `;
+            document.getElementById('detailsInfo').innerHTML = infoHtml;
+
+
+            let rawHtml = '<div class="info-section"><h4>Данные</h4>';
+
+            try {
+                const rawData = JSON.parse(item.raw || '{}');
+                rawHtml += `<pre class="raw-json">${JSON.stringify(rawData, null, 2)}</pre>`;
+            } catch (e) {
+                rawHtml += `<p class="text-muted">${item.raw || 'Нет данных'}</p>`;
+            }
+
+            rawHtml += '</div>';
+            document.getElementById('detailsRaw').innerHTML = rawHtml;
+
+            document.getElementById('detailsPanel').style.display = 'block';
+
+            renderTable();
+
+            document.getElementById('detailsPanel').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function hideDetails() {
+            currentDetailsId = null;
+            document.getElementById('detailsPanel').style.display = 'none';
+            renderTable();
         }
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -136,14 +213,20 @@
                 renderTable();
             });
 
-            document.getElementById('sort').addEventListener('change', renderTable);
+            document.getElementById('sort').addEventListener('change', () => {
+                currentPage = 1;
+                renderTable();
+            });
+
             document.getElementById('refresh').addEventListener('click', loadOsdrData);
+
             document.getElementById('prevBtn').addEventListener('click', () => {
                 if (currentPage > 1) {
                     currentPage--;
                     renderTable();
                 }
             });
+
             document.getElementById('nextBtn').addEventListener('click', () => {
                 const filtered = filterData();
                 const totalPages = Math.ceil(filtered.length / itemsPerPage);
@@ -152,6 +235,8 @@
                     renderTable();
                 }
             });
+
+            document.getElementById('closeDetails').addEventListener('click', hideDetails);
         });
     </script>
 }
